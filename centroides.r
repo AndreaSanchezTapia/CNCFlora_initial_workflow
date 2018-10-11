@@ -4,13 +4,13 @@
 
 #primeiro ler a planilha com a lista de coordenadas por centroide
 
-setwd("C:/wd/")
+
 tabela_centroides <- read.delim(file = "centroide_municipio.csv", header = TRUE, sep = ";", stringsAsFactors = FALSE, fileEncoding = "ISO-8859-9")
 tabela_centroides_ucs <- read.delim(file = "centroide_uc.csv", header = TRUE, sep = ";", stringsAsFactors = FALSE, fileEncoding = "ISO-8859-9")
 arquivos <- grep("revisada", list.files(), value = TRUE, ignore.case = TRUE)
 fa <- function(x) iconv(x, to = "ASCII//TRANSLIT") #função para remover acentos
 
-for (z in 1:length(arquivos)){  
+for (z in 1:length(arquivos)){
 options(warn=0)
 setwd("C:/wd/")
 print(z)
@@ -26,18 +26,18 @@ write(beta, file = arquivos[z])
 tabela_modelo <- read.delim(file = arquivos[z], header = TRUE, sep = "*", fileEncoding = "ISO-8859-9", quote = "", stringsAsFactors = FALSE)
 familia <- as.character(tabela_modelo$family[1])
 especie <- as.character(tabela_modelo$acceptedNameUsage[1])
-#primeiro incluir coordenadas de tudo que tem munic�pio e não tem localidade
+#primeiro incluir coordenadas de tudo que tem munic?pio e não tem localidade
 for (i in 1:length(tabela_modelo$family)){
 localidade <- as.character(tabela_modelo$locality[i])
 if (is.na(localidade)){
 
-localidade <- as.character("")    
-  
+localidade <- as.character("")
+
 }
 
 #if (nchar(localidade) > 0){{next}} #eu acho que esse next tá redundante
 #if (length(localidade) == 0){{next}} ########### adicionei isso dps, pode ser retirado
-if (nchar(localidade) == 0){ 
+if (nchar(localidade) == 0){
 municipio <- as.character(tabela_modelo$municipality[i])
 consulta <- paste("^", municipio, "$", sep = "")
 estado <- as.character(tabela_modelo$stateProvince[i])
@@ -47,7 +47,7 @@ query_mun <- grep(consulta, tabela_estado$NOME)
 fid <- tabela_estado$FID[query_mun]
 if (length(fid) == 0){{next}}
 fid <- paste("^", fid, "$", sep = "")
-query2 <- grep(fid, tabela_centroides$FID)  
+query2 <- grep(fid, tabela_centroides$FID)
 if (length(query2) > 0){
 longitude <- tabela_centroides$POINT_X[query2]
 latitude <- tabela_centroides$POINT_Y[query2]
