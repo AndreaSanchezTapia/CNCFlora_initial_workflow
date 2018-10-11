@@ -1,35 +1,33 @@
 #### Script BGCI unificado
+#le tudo ----
 library(dplyr)
 library("stringr")
 library("rgbif")
 library(readxl)
-
+source("new_duplicated.R")
 arvoresLC <- read_excel("./data/arvores_endemicas_possiveis_nao_ameacadas.xlsx", sheet = 1)
-head(arvoresLC)
 tabela <- read.delim("./data/especies.csv", sep = ";", header = F)
-head(tabela)
 familias <- as.character(tabela$V1)
 especies_complete <- as.character(tabela$V2)
 especies <- word(especies_complete, start = 1, end = 2)
+tabela_sistema <- read.csv(file = "./data/occurrences.csv", sep = ";", header = TRUE)
 #le inpa----
 tabela_inpa_splink <- read.csv(file = "./data/inpa_filtrado.csv", header = TRUE)
-############ aqui tem que entrar a parte referente ao inpa
 # a coluna acceptedNameUsage não existe e a coluna scientifiName nãõ tem autor
-tabela_inpa_splink <-     tabela_inpa_splink %>%
+tabela_inpa_splink <- tabela_inpa_splink %>%
     dplyr::mutate(acceptedNameUsage = paste(scientificName, scientificNameAuthorship))
-#os comentarios tem que ser cirados igual que para gbof
-comm_inpa <- tabela_inpa_splink %>% dplyr::select(contains("Notes"), contains("Remarks"), contains("typeStatus")) %>%  tidyr::unite(comment)
+#os comentarios tem que ser criados igual que para gbif
+comm_inpa <- tabela_inpa_splink %>% dplyr::select(contains("Notes"),
+                                                  contains("Remarks"),
+                                                  contains("typeStatus")) %>%
+    tidyr::unite(comment)
 tabela_inpa_splink <- bind_cols(tabela_inpa_splink, comm_inpa)
-
 tombos_inpa_splink <- tabela_inpa_splink$catalogNumber #lista de tombos da planilha do
 
-#isso pode entrar em outro lugar, acho que antes do loop, porque essa planilha só vai precisar ser lida uma vez
-#----
-tabela_sistema <- read.csv(file = "./data/occurrences.csv", sep = ";", header = TRUE)
 #extração de registros por espécie do gbif
 #dir.create("output")
 
-#buscando registros de gbif
+#buscando registros de gbif----
 for (i in 1:length(especies)) {
     dir.create(paste0("./output/",familias[i]), showWarnings = F)
     nome_arquivo <- paste0("./output/", familias[i],"/",familias[i],"_", especies[i],"_", "raw.csv")
@@ -77,6 +75,7 @@ for (i in 1:length(especies)) {
     }
 
 tabela_especie <- occs.df1 %>% select(one_of(names(tabela_sistema)))
+tabela_especie <- bind_rows(tabela_especie, tabela_sistema)
 write.csv(tabela_especie, file = nome_arquivo)
 
 
@@ -122,131 +121,89 @@ write.csv(tabela_especie, file = nome_arquivo)
             #tabela_especie$recordedBy[query2.i] <- as.character(autor.i)
             proof <- paste(as.character(tabela_especie$collectionCode[query2.i]), as.character(tabela_especie$catalogNumber[query2.i]), sep = " ")
             proof_name <- paste0("./output/", familias[i],"/",familias[i],"_", especies[i],"_", "inpa_proof.csv")
-            write(proof, file = proof_name, append = TRUE)
+            write(proof, file = proof_name, append = TRUE)#si uno sigue rodando esto crea duplicados
         }
     }
 #seleciona as colunas que tem o mesmo nome qu eas colunas de tabela especie
     inpa.sp <- tabela_inpa_splink %>%
         filter(catalogNumber %in% tombos_inpa_especie) %>%
-        select(one_of(names(tabela_especie)))
+        select(one_of(names(tabela_sistema)))#para que pegue todas las columnas posibles del sistema
     tabela_especie <- bind_rows(tabela_especie, inpa.sp)
     write.csv(tabela_especie, file = nome_out)
 }
 
 
 
-    #########################################
-
+#########################################
     #Limpeza de registros
 for (i in 1:length(especies)) {
-   nome_arquivo <- paste0("./output/", familias[i],"/",familias[i],"_", especies[i],"_", "raw.csv")
-    nome_out <- paste0("./output/", familias[i],"/",familias[i],"_", especies[i],"_", "inpa.csv")
     print(paste("Limpando", especies[i], i, "de", length(especies), sep = " "))
+    ###     o arquivo original sem o inpa
+    nome_arquivo <- paste0("./output/", familias[i],"/",familias[i],"_", especies[i],"_", "raw.csv")
+    ###     o arquivo com o inpa
+    nome_inpa <- paste0("./output/", familias[i],"/",familias[i],"_", especies[i],"_", "inpa.csv")
+    ###     o nome do arquivo que será criado com registros excluídos
     nome_excluded <- paste0("./output/",familias[i],"/",familias[i], "_", especies[i],"_",
                             "excluded.csv")
+### o nome do arquivo que será criado com registros duplicados (coletor, ano, numero de coleta). nao incluo nos excluded porque ele não vai ser excluido, vai ter uma cópia dele em clean e o duplicado não pode aparecer no excluded, vai ser confuso. mas eu quero checar que os s.n. não foram tomados como duplicados:
+    nome_duplicata <- paste0("./output/",familias[i],"/",familias[i], "_", especies[i],"_",
+                            "duplicata.csv")
+### o nome do arquivo limpo que será criado no final
+    nome_clean <- paste0("./output/",familias[i],"/",familias[i], "_", especies[i],"_",
+                         "clean.csv")
 
 #agora a "tabela" é tabela_especie, entao tenho que substituir isso tudo
-tabela_especie <- read.csv(nome_out, row.names = 1, stringsAsFactors = F)
+    #vai ser com a tabela do inpa
+tabela_especie <- read.csv(nome_inpa, row.names = 1, stringsAsFactors = F)
 
 #remover registros não informativos, sem coletor, numero de coleta, ano e informações de localidade----
-
-
-tabela_exclude1 <- tabela_especie %>% dplyr::filter(is.na(year) & is.na(recordedBy) & is.na(stateProvince) & is.na(municipality)& is.na(locality))
+#seleciona os registros que devem sair
+tabela_exclude1 <- tabela_especie %>% dplyr::filter(is.na(year) &
+                                                        is.na(recordedBy) &
+                                                        is.na(stateProvince) &
+                                                        is.na(municipality) &
+                                                        is.na(locality))
+#a tabela de especie menos esses registros (antijoin)
 tabela_especie <- dplyr::anti_join(tabela_especie, tabela_exclude1)
 #remover registros fora do brasil ou que não tem informação de país----
+#seleciona os registros que devem sair
 tabela_exclude2 <- tabela_especie %>% dplyr::filter(is.na(country) | country != "Brazil")
+#a tabela de especie menos esses registros (antijoin)
 tabela_especie <- dplyr::anti_join(tabela_especie, tabela_exclude2)
 #registros que não tem nome de coletor nem numero de coleta
+#seleciona os registros que devem sair
 tabela_exclude3 <- tabela_especie %>%
     dplyr::filter(is.na(recordedBy) & is.na(recordNumber))
+#a tabela de especie menos esses registros (antijoin)
 tabela_especie <- dplyr::anti_join(tabela_especie, tabela_exclude3)
+#junto todas as tabelas do que seria excluído (cada passo gerou tabelas diferentes)
 tabela_exclude <- dplyr::bind_rows(tabela_exclude1, tabela_exclude2, tabela_exclude3)
 write.csv(tabela_exclude, file = nome_excluded)
-}
+#esta excluded não inclui possíveis duplicados
 
-#esse loop tá removendo todas linhas, já consertei uma vez
 #remover registros com número de coleta, estado e ano iguais (coletas colaborativas duplicadas)
-    # tá considerando s.n. como numero de coleta igual, vou incluir um escape de s.n. e de NA
-    #o escape são as duas linhas com next
-    #parece estar ok
-    vetor_duplicata <- as.character()
-    for (f in 1:dim(tabela_especie)[1]) {
-        linha.i <- tabela_especie[f,]
-        dado.i <- paste(linha.i$year, linha.i$recordNumber, linha.i$stateProvince, sep = "")
-        #print(dado.i)
-        vetor_duplicata <- append(vetor_duplicata, dado.i)
-    }
+#gera um vetor TrueFalse dizendo quem é duplicado, omitindo os s.n e NA
+vetor_duplicata <- tabela_especie %>% select(year, recordNumber, stateProvince) %>%
+    new_duplicated(., incomparables = c("NA", "s.n", "s/n"))
+#cria a tabela de duplicados e salva
+tabela_duplicata <- tabela_especie[vetor_duplicata,]
+#write.csv(tabela_duplicata, file = nome_duplicata)
+#tira os duplicados da tabela especie
+tabela_especie <- tabela_especie[!vetor_duplicata,]
 
-    for (a in 1:length(vetor_duplicata)) {
-        teste.i <- vetor_duplicata[a]
-        if (length(grep("s.n.", vetor_duplicata[a])) >= 1) {next}
-        if (length(grep("NA", vetor_duplicata[a], ignore.case = FALSE)) >= 1) {next}
-        x <- tryCatch({grep(teste.i, vetor_duplicata)}, error = function(e) {x <- 0}) #inclui um trycatch aqui
-        #print(x)
-        if (length(x) > 1) {
-            pos.i <- grep(teste.i, vetor_duplicata)
-            pos2.i <- pos.i[(1 + 1):length(pos.i)]
-            pos2.i <- pos2.i[!is.na(pos2.i)]
-            #write(pos2.i, file = "exclude", append = TRUE, sep = "\n")
-            rm(x)
-        }
-    }
-tabela_exclude <- bind_rows(tabela_exclude,  slice(tabela_especie, pos2.i))
-write.csv(tabela_exclude, file = nome_excluded)
-tabela_especie <- tabela_especie %>% dplyr::slice(-pos2.i)
-
-
-    if (length(query) >= 1) {
-        positions_exclude <- as.numeric(unique(readLines("exclude")))
-        file.remove("exclude")
-        positions_exclude <- positions_exclude[!is.na(positions_exclude)] #isso remove os NA do vetor
-        write.table(tabela_especie[positions_exclude,], file = nome_excluded, quote = F, row.names = F, col.names = T, sep = "*", append = TRUE)
-        tabela_especie <- tabela_especie[-positions_exclude,] #não pode ter NA aqui
-    }
-
-    ####################################################
-    #registros com mesmo coletor e número de coleta
-    #preciso incluir escape s.n. e NA {next}
-
-    vetor_duplicata <- as.character()
-    for (b in 1:dim(tabela_especie)[1]) {
-        linha.i <- tabela_especie[b,]
-        dado.i <- paste(linha.i$recordedBy, linha.i$recordNumber, sep = "")
-        #print(b)
-        vetor_duplicata <- append(vetor_duplicata, dado.i)
-    }
-
-
-    for (a in 1:length(vetor_duplicata)) {
-        teste.i <- vetor_duplicata[a]
-        if (length(grep("s.n.", vetor_duplicata[a])) >= 1){next} #escape
-        if (length(grep("NA", vetor_duplicata[a], ignore.case = FALSE)) >= 1){next} #escape
-        #print(a)
-        x <- tryCatch({grep(teste.i, vetor_duplicata)}, error = function(e) {x <- 0}) #inclui um trycatch aqui
-        if (length(x) > 1) {
-            pos.i <- grep(teste.i, vetor_duplicata)
-            pos2.i <- pos.i[(1 + 1):length(pos.i)]
-            write(pos2.i, file = "exclude", append = TRUE, sep = "\n")
-            rm(x)
-        }
-    }
-
-
-    query <- grep("^exclude$", list.files())
-    if (length(query) >= 1) {
-        positions_exclude <- as.numeric(unique(readLines("exclude")))
-        positions_exclude <- positions_exclude[!is.na(positions_exclude)]
-        file.remove("exclude")
-        write.table(tabela_especie[positions_exclude,], file = nome_excluded, quote = F, row.names = F, col.names = T, sep = "*", append = TRUE)
-        tabela_especie <- tabela_especie[-positions_exclude,]
-    }
-
-    nome_clean <- paste(familias[i], especies[i], "clean", ".csv", sep = "_")
-
-    write.table(tabela_especie, file = nome_clean, quote = F, row.names = F, col.names = T, sep = "*", append = TRUE, na = "")
-
-
+####################################################
+#registros com mesmo coletor e número de coleta
+#preciso incluir escape s.n. e NA {next}
+vetor_duplicata <- tabela_especie %>% select(recordedBy, recordNumber) %>%
+    new_duplicated(., incomparables = c("s.n", "s/n"))
+#cria a tabela de duplicados e salva
+tabela_duplicata <- bind_rows(tabela_duplicata, tabela_especie[vetor_duplicata,])
+write.csv(tabela_duplicata, file = nome_duplicata)
+#tira os duplicados da tabela especie
+tabela_especie <- tabela_especie[!vetor_duplicata,]
+write.csv(tabela_especie, file = nome_clean)
 }
+
 
 
 
