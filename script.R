@@ -21,8 +21,11 @@ comm_inpa <- tabela_inpa_splink %>% dplyr::select(contains("Notes"),
                                                   contains("Remarks"),
                                                   contains("typeStatus")) %>%
     tidyr::unite(comment)
-tabela_inpa_splink <- bind_cols(tabela_inpa_splink, comm_inpa)
-tombos_inpa_splink <- tabela_inpa_splink$catalogNumber #lista de tombos da planilha do
+#muda o nome da instituitcao para poder juntar as tabelas
+tabela_inpa_splink <- bind_cols(tabela_inpa_splink, comm_inpa) %>% mutate(institutionCode = "Instituto Nacional de Pesquisas da Amazônia (INPA)")
+#todos os coletores do inpa
+colectores_inpa <- tabela_inpa_splink %>% select(institutionCode, catalogNumber, collector) %>% mutate(collector = as.character(collector))
+class(colectores_inpa$catalogNumber)
 
 #extração de registros por espécie do gbif
 #dir.create("output")
@@ -78,58 +81,42 @@ tabela_especie <- occs.df1 %>% select(one_of(names(tabela_sistema)))
 tabela_especie <- bind_rows(tabela_especie, tabela_sistema)
 write.csv(tabela_especie, file = nome_arquivo)
 
+}
+
 
 #tenho que colocar em accepted name usage o nome científico da espécie aqui de acordo com a tabela original, com autor
 #eu acabo de incluir a coluna scientificName - fica co autor. Andrea 9/10/18
 #nem precisa ler mais aqui
 #tabela_gbif <- read.csv(nome_arquivo, row.names = 1)
 #as.vector(apply(tabela_gbif, 2, class))#é tudo character
-#já é tudo caractere não precisa modificar
-#e não precisa modificar linha pr linha, a coluna pode.
 
-#isto é absolutamente necessário?
-#x <- paste(as.character(tabela_gbif$observacoes1[a]), as.character(tabela_gbif$observacoes2[a]), as.character(tabela_gbif$observacoes3[a]), sep = " ")
-#x <- gsub("\\;","",x)
-#x <- gsub("\\:","",x)
-#x <- gsub('\"',"",x)
-#x <- gsub("/","",x)
-#tabela_neo[a,27] <- x
-#    }
+#limpar a coluna de coletor do inpa---
 
-
-
-#dir.create("inpa")
-#for (i in 1:length(especies)) {
- #   nome_arquivo <- paste0("./output/", familias[i],"/",familias[i],"_", especies[i],"_", "raw.csv")
+for (i in 1:length(especies)) {
+    #nomes
+    nome_arquivo <- paste0("./output/", familias[i],"/",familias[i],"_", especies[i],"_", "raw.csv")
     nome_out <- paste0("./output/", familias[i],"/",familias[i],"_", especies[i],"_", "inpa.csv")
     print(paste("Inpa", especies[i], i, "de", length(especies), sep = " "))
+    #le a tabela
+    tabela_especie <- read.csv(nome_arquivo, row.names = 1, stringsAsFactors = F) %>% mutate(catalogNumber = factor(catalogNumber))
 
-    #tabela_especie <- read.csv(nome_arquivo, row.names = 1, stringsAsFactors = F)
-
-    query <- grep("inpa", tabela_especie$collectionCode, ignore.case = TRUE)
-    tombos_inpa_especie <- tabela_especie$catalogNumber[query]
-    overlap_tombos <- as.numeric(intersect(tombos_inpa_splink, tombos_inpa_especie))
-    #problema
-    if (length(overlap_tombos) > 0) { #só fazer isso se tiver coleta no inpa
-        for (c in 1:length(overlap_tombos)) {
-            tombo.i <- overlap_tombos[c]
-            regex.i <- paste("^", tombo.i, "$", sep = "")
-            query.i <- grep(tombo.i, tabela_inpa_splink$catalognumber)
-            autor.i <- tabela_inpa_splink$collector[query.i]
-            query2.i <- grep(regex.i, tabela_especie$catalogNumber)
-            #nao vou fazer isto porque já não cria o problema
-            #tabela_especie$recordedBy[query2.i] <- as.character(autor.i)
-            proof <- paste(as.character(tabela_especie$collectionCode[query2.i]), as.character(tabela_especie$catalogNumber[query2.i]), sep = " ")
-            proof_name <- paste0("./output/", familias[i],"/",familias[i],"_", especies[i],"_", "inpa_proof.csv")
-            write(proof, file = proof_name, append = TRUE)#si uno sigue rodando esto crea duplicados
-        }
-    }
-#seleciona as colunas que tem o mesmo nome qu eas colunas de tabela especie
-    inpa.sp <- tabela_inpa_splink %>%
-        filter(catalogNumber %in% tombos_inpa_especie) %>%
-        select(one_of(names(tabela_sistema)))#para que pegue todas las columnas posibles del sistema
-    tabela_especie <- bind_rows(tabela_especie, inpa.sp)
+    #junta a tabela com os coletores
+    if ("Instituto Nacional de Pesquisas da Amazônia (INPA)" %in% tabela_especie$institutionCode) {
+    proof_name <- paste0("./output/", familias[i],"/",familias[i],"_", especies[i],"_", "inpa_proof.csv")
+    tabela_especie <- left_join(tabela_especie, colectores_inpa)
+    #tudo o que for do inpa bota o coletor e tira a coluna collector
+    tabela_especie <- tabela_especie %>%
+        mutate(recordedBy = if_else(tabela_especie$institutionCode %in%
+                                        "Instituto Nacional de Pesquisas da Amazônia (INPA)", collector, recordedBy)) %>%
+        select(-collector)
+    #escreve
     write.csv(tabela_especie, file = nome_out)
+    proof <- tabela_especie %>% filter(institutionCode == "Instituto Nacional de Pesquisas da Amazônia (INPA)") %>%
+        select(institutionCode, catalogNumber, recordedBy) %>% distinct()
+    write.csv(proof, file = proof_name)
+    } else {
+ write.csv(tabela_especie, file = nome_out)
+    }
 }
 
 
