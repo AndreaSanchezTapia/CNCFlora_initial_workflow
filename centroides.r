@@ -8,7 +8,7 @@ library(readxl)
 library(textclean)
 library(flora)
 source("new_duplicated.R")
-devtools::install_github("diogosbr/spfilt")
+#devtools::install_github("diogosbr/spfilt")
 library(spfilt)
 # le tudo
 arvoresLC <- read_excel("./data/arvores_endemicas_possiveis_nao_ameacadas.xlsx", sheet = 1)
@@ -37,13 +37,17 @@ tabela_centroides_ucs <- read.delim(file = "./data/centroide_uc.csv",
                                     fileEncoding = "ISO-8859-9")
 #shape estados
 library(rgdal)
-estados <- rgdal::readOGR(dsn = "./data/BRA_adm_shp", layer = "BRA_adm1")
-plot(estados)
+#estados2 <- rgdal::readOGR(dsn = "./data/BRA_adm_shp", layer = "BRA_adm1")
+estados <- rgdal::readOGR(dsn = "./data/shape/Limites_v2017/", layer = "lim_unidade_federacao_a")
+mpos <- rgdal::readOGR(dsn = "./data/shape/Limites_v2017/", layer = "lim_municipio_a")
 
-centroides_estados <- rgeos::gCentroid(estados, byid = T, id = estados$NAME_1) %>% data.frame %>%
+plot(estados)
+plot(estados2, add = T,col = "red")
+centroides_estados <- rgeos::gCentroid(estados, byid = T, id = estados$nome) %>% data.frame %>%
     tibble::rownames_to_column(var = "estados_shp") %>% mutate(stateProvince = replace_non_ascii(tolower(estados_shp))) %>%
     rename(x_estado = x, y_estado = y)
 centroides_estados
+points(centroides_estados$x_estado, centroides_estados$y_estado, col = "blue")
 # tira todos os caracteres e bota minuscula
 tabela_centroides <- tabela_centroides %>%
     mutate(municipality = replace_non_ascii(tolower(NOME)),
