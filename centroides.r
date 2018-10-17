@@ -206,8 +206,14 @@ if (any(is.na(tabela_corrigida$notes))) {
 checar
 
 ####sp_filt de Diogo
-mpos <- rgdal::readOGR(dsn = "./data/BRA_adm_shp", layer = "BRA_adm2")
-
+spfilt::filt()
+# mpos <- rgdal::readOGR(dsn = "./data/shape/Limites_v2017/", layer = "lim_municipio_a")
+# tabela_centroides_2 <- tabela_centroides %>% rename(geocodigo = GEOCODIGO, nome = NOME) %>% mutate(geocodigo = as.factor(geocodigo))
+# mpos@data <- left_join(mpos@data, tabela_centroides_2)
+# proj4string(mpos)
+# mpos2 <- sp::spTransform(mpos, CRSobj = CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"))
+# names(mpos2)
+# dim(mpos@data)
 
 for (i in 1:length(especies)) {
     print(paste("Processando", especies[i], i, "de", length(especies), sep = " "))
@@ -216,12 +222,30 @@ for (i in 1:length(especies)) {
     nome_spfilt <- paste0("./output/",familias[i],"/",familias[i], "_", especies[i],"_",
                               "sp_filt.csv")
     tabela_especie <- read.csv(nome_centroides, row.names = 1, stringsAsFactors = F)
-    tabela_sppfilt <- tabela_especie %>% select("scientificName", 'new_Lon', 'new_Lat', 'municipality', "stateProvince") %>%
+    tabela_especie <- tabela_especie %>% dplyr::mutate(ID = row_number())
+    tabela_sppfilt <- tabela_especie %>%
+        filter(notes %in% c("original coordinates", "centroide mpo", "centroide mpo (0)", NA))
+
+    tabela_sppfilt <- tabela_sppfilt %>%
+        select("scientificName", 'new_Lon', 'new_Lat', 'municipality', "stateProvince") %>%
         rename(species = scientificName,
                lon = new_Lon,
                lat = new_Lat,
                adm1 = stateProvince)
-    tabela_sppfilt <- na.exclude(tabela_sppfilt)
-    sp_filt_res <- spfilt::filt(tabela_sppfilt, shape.municipios = mpos)
-    write.csv(sp_filt_res, nome_spfilt)
+
+        tabela_sppfilt <- tabela_sppfilt[complete.cases(cbind(tabela_sppfilt$lon, tabela_sppfilt$lat)),]
+
+
+    sp_filt_res <- filt(pts = tabela_sppfilt,
+                           inverted = T)
+
+sp_filt_res <- sp_filt_res %>% rename(scientificName = species,
+                                      new_Lon = lon,
+                                      new_Lat = lat,
+                                      municipality = county.orig)
+
+#resultado_final <- left_join(tabela_sppfilt, sp_filt_res)
+#if (nrow(tabela_especie) != nrow(resultado_final)) stop()
+        write.csv(sp_filt_res, nome_spfilt)
 }
+
