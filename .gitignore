@@ -2,3 +2,8 @@
 .Rhistory
 .RData
 .Ruserdata
+data/BRA_adm_shp
+data/shape/Limites_v2017
+data/shape/Localidades_v2017
+old
+oldwd
