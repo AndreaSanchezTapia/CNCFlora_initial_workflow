@@ -7,6 +7,7 @@ library("rgbif")
 library(readxl)
 library(textclean)
 library(flora)
+library(lubridate)
 #devtools::install_github("diogosbr/spfilt")
 library(spfilt)
 # le tudo
@@ -82,9 +83,13 @@ for (i in 1:length(especies)) {
 
     #igual com o municipio
     tabela_especie_edit <- tabela_especie %>%
-        mutate(municipality = replace_non_ascii(tolower(municipality)),
-               stateProvince = replace_non_ascii(tolower(stateProvince)),
-               country = replace_non_ascii(tolower(country))) %>%
+        rename(municipality.original = municipality) %>%
+        rename(stateProvince.original = stateProvince) %>%
+        rename(country.original = country) %>%
+
+    mutate(municipality = replace_non_ascii(tolower(municipality.original)),
+           stateProvince = replace_non_ascii(tolower(stateProvince.original)),
+           country = replace_non_ascii(tolower(country.original))) %>%
 #corrige espirito santo
                 mutate(stateProvince = ifelse(stateProvince == "espa-rito santo",
                                       "espirito santo",
@@ -125,7 +130,9 @@ mutate(new_Lat = NA, new_Lon = NA, notes = NA) %>%
                 POINT_Y,
                 new_Lat),
                    new_Lon = ifelse(
-                decimalLatitude == 0 & decimalLongitude == 0 &  !is.na(municipality) &
+                decimalLatitude == 0 &
+                    decimalLongitude == 0 &
+                    !is.na(municipality) &
                    !is.na(stateProvince),
                 POINT_X,
                 new_Lon),
@@ -135,38 +142,39 @@ mutate(new_Lat = NA, new_Lon = NA, notes = NA) %>%
                 "centroide mpo (0)",
                 notes)) %>%
             #cuando existen y valen cero
-            mutate(new_Lat = ifelse(
-                decimalLatitude == 0 & decimalLongitude == 0 & is.na(municipality) &
-                    !is.na(stateProvince),
-                y_estado,
-                new_Lat),
-                   new_Lon = ifelse(
-                decimalLatitude == 0 & decimalLongitude == 0 &  is.na(municipality) &
-                   !is.na(stateProvince),
-                x_estado,
-                new_Lon),
-                notes = ifelse(
-                decimalLatitude == 0 & decimalLongitude == 0 &  is.na(municipality) &
-                    !is.na(stateProvince),
-                "centroide estado (0)",
-                notes)) %>%
+            # mutate(new_Lat = ifelse(
+            #     decimalLatitude == 0 & decimalLongitude == 0 & is.na(municipality) &
+            #         !is.na(stateProvince),
+            #     y_estado,
+            #     new_Lat),
+            #        new_Lon = ifelse(
+            #     decimalLatitude == 0 & decimalLongitude == 0 &  is.na(municipality) &
+            #        !is.na(stateProvince),
+            #     x_estado,
+            #     new_Lon),
+            #     notes = ifelse(
+            #     decimalLatitude == 0 & decimalLongitude == 0 &  is.na(municipality) &
+            #         !is.na(stateProvince),
+            #     "centroide estado (0)",
+            #     notes)) %>%
         #quando não existe , bota o estado
-            mutate(new_Lat = ifelse(
-                is.na(decimalLatitude) & is.na(decimalLongitude) &  is.na(municipality) &
-                    !is.na(stateProvince), y_estado, new_Lat),
-                new_Lon = ifelse(
-                    is.na(decimalLatitude) & is.na(decimalLongitude) &  is.na(municipality) &
-                        !is.na(stateProvince), y_estado, new_Lon),
-                notes = ifelse(
-                    is.na(decimalLatitude) & is.na(decimalLongitude) &  is.na(municipality) &
-                        !is.na(stateProvince), "centroide estado", notes)) %>%
+            #mutate(new_Lat = ifelse(
+            #    is.na(decimalLatitude) & is.na(decimalLongitude) &
+            #is.na(municipality) &
+             #       !is.na(stateProvince), y_estado, new_Lat),
+              #  new_Lon = ifelse(
+               #     is.na(decimalLatitude) & is.na(decimalLongitude) &  is.na(municipality) &
+                #        !is.na(stateProvince), y_estado, new_Lon),
+                #notes = ifelse(
+                 #   is.na(decimalLatitude) & is.na(decimalLongitude) &  is.na(municipality) &
+                  #      !is.na(stateProvince), "centroide estado", notes)) %>%
             #quando não existe mas tem municipio , bota o municipio
             mutate(new_Lat = ifelse(
                 is.na(decimalLatitude) & is.na(decimalLongitude) &  !is.na(municipality) &
                     !is.na(stateProvince), POINT_Y, new_Lat),
                 new_Lon = ifelse(
                     is.na(decimalLatitude) & is.na(decimalLongitude) &  !is.na(municipality) &
-                        !is.na(stateProvince), POINT_Y, new_Lon),
+                        !is.na(stateProvince), POINT_X, new_Lon),
                 notes = ifelse(
                     is.na(decimalLatitude) & is.na(decimalLongitude) &  !is.na(municipality) &
                         !is.na(stateProvince), "centroide mpo", notes)) %>%
@@ -188,19 +196,37 @@ mutate(new_Lat = NA, new_Lon = NA, notes = NA) %>%
 
 print(count(tabela_corrigida, notes))
 
-    tabela_corrigida <- tabela_corrigida %>%
-        select(-x_estado, -y_estado, -POINT_X, -POINT_Y,
-               -NOME, -GEOCODIGO, -NOMEUF, -SIGLAUF, -estados_shp, -nome, -sigla)
+#los cambios que pidió mary
+tabela_corrigida2 <- tabela_corrigida %>%
+    mutate(
+        modified = "",
+        institutionCode = "",
+        identificationQualifier = "",
+        infraspecificEpithet = "",
+        typeStatus = "",
+        fieldNumber = "",
+        occurrenceID = "",
+
+        municipality = municipality.original,
+        stateProvince = stateProvince.original,
+        decimalLongitude = new_Lon,
+        decimalLatitude = new_Lat,
+        bibliographicCitation = "GBIF",
+        comments = notes
+    ) %>% select(one_of(names(tabela_sistema)))
+    tabela_corrigida2$dateIdentified <- as_date(tabela_corrigida2$dateIdentified) %>% ymd() %>% as.character()
+tabela_corrigida2[is.na(tabela_corrigida2)] <- ""
 
     #para checar o resultado
-    write.csv(tabela_corrigida, file = nome_centroides)
-if (any(is.na(tabela_corrigida$notes))) {
-    checar <- append(checar, i)
-    tabela_checar <- tabela_corrigida %>% filter(is.na(notes))
-    nome_checar <- paste0("./output/",familias[i],"/",familias[i], "_", especies[i],"_",
-                              "centroides_checar.csv")
-    write.csv(tabela_checar, file = nome_checar)
-}
+    write.csv(tabela_corrigida2, file = nome_centroides)
+
+    #if (any(is.na(tabela_corrigida$notes))) {
+ #   checar <- append(checar, i)
+  #  tabela_checar <- tabela_corrigida %>% filter(is.na(notes))
+   # nome_checar <- paste0("./output/",familias[i],"/",familias[i], "_", especies[i],"_",
+    #                          "centroides_checar.csv")
+    #write.csv(tabela_checar, file = nome_checar)
+#}
 }
 
 checar
