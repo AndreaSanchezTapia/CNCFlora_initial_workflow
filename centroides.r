@@ -81,6 +81,19 @@ for (i in 1:length(especies)) {
     tabela_especie <- read.csv(nome_clean, row.names = 1, stringsAsFactors = F) %>%
         mutate(catalogNumber = factor(catalogNumber))
 
+    #corrige nombres de estados
+    #corrige siglas
+    substituir_siglas <- function(x) {
+        x1 <- textclean::replace_non_ascii(tolower(x))
+        if (any(sigla_estados$sigla %in% x1)) {
+            return(as.character(sigla_estados$nome[which(sigla_estados$sigla == x1)]))
+        } else {
+            as.character(x)
+        }
+    }
+
+    tabela_especie$stateProvince <- purrr::map(tabela_especie$stateProvince, .f = substituir_siglas) %>%
+        simplify2array()
     #igual com o municipio
     tabela_especie_edit <- tabela_especie %>%
         rename(municipality.original = municipality) %>%
@@ -96,17 +109,7 @@ for (i in 1:length(especies)) {
                                       stateProvince)) %>%
         #corrige estados na casa de municipios
         mutate(municipality = ifelse(municipality %in% c("brasil", "brazil", non_dupl_names), NA, municipality))
-#corrige nombres de estados
-    #corrige siglas
-    substituir_siglas <- function(x) {
-        if (any(sigla_estados$sigla %in% x)) {
-            return(sigla_estados$stateProvince[which(sigla_estados$sigla == x)])
-        } else {
-            x
-        }
-    }
 
-    tabela_especie_edit$stateProvince <- lapply(tabela_especie_edit$stateProvince, substituir_siglas) %>% simplify2array()
 
 #junta con centroides
     tabela_especie_edit <- tabela_especie_edit %>%
@@ -233,13 +236,14 @@ checar
 
 ####sp_filt de Diogo
 spfilt::filt()
-# mpos <- rgdal::readOGR(dsn = "./data/shape/Limites_v2017/", layer = "lim_municipio_a")
-# tabela_centroides_2 <- tabela_centroides %>% rename(geocodigo = GEOCODIGO, nome = NOME) %>% mutate(geocodigo = as.factor(geocodigo))
-# mpos@data <- left_join(mpos@data, tabela_centroides_2)
-# proj4string(mpos)
-# mpos2 <- sp::spTransform(mpos, CRSobj = CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"))
+mpos <- rgdal::readOGR(dsn = "./data/shape/Limites_v2017/", layer = "lim_municipio_a")
+tabela_centroides_2 <- tabela_centroides %>% rename(geocodigo = GEOCODIGO, nome = NOME) %>% mutate(geocodigo = as.factor(geocodigo))
+mpos@data <- left_join(mpos@data, tabela_centroides_2)
+proj4string(mpos)
+mpos2 <- sp::spTransform(mpos, CRSobj = CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"))
 # names(mpos2)
 # dim(mpos@data)
+shape.municipios <- mpos2
 
 for (i in 1:length(especies)) {
     print(paste("Processando", especies[i], i, "de", length(especies), sep = " "))
@@ -248,15 +252,14 @@ for (i in 1:length(especies)) {
     nome_spfilt <- paste0("./output/",familias[i],"/",familias[i], "_", especies[i],"_",
                               "sp_filt.csv")
     tabela_especie <- read.csv(nome_centroides, row.names = 1, stringsAsFactors = F)
-    tabela_especie <- tabela_especie %>% dplyr::mutate(ID = row_number())
-    tabela_sppfilt <- tabela_especie %>%
-        filter(notes %in% c("original coordinates", "centroide mpo", "centroide mpo (0)", NA))
+
+    tabela_sppfilt <- tabela_especie %>% dplyr::mutate(ID = row_number())
 
     tabela_sppfilt <- tabela_sppfilt %>%
-        select("scientificName", 'new_Lon', 'new_Lat', 'municipality', "stateProvince") %>%
+        select("scientificName", 'decimalLongitude', 'decimalLatitude', 'municipality', "stateProvince") %>%
         rename(species = scientificName,
-               lon = new_Lon,
-               lat = new_Lat,
+               lon = decimalLongitude,
+               lat = decimalLatitude,
                adm1 = stateProvince)
 
         tabela_sppfilt <- tabela_sppfilt[complete.cases(cbind(tabela_sppfilt$lon, tabela_sppfilt$lat)),]
