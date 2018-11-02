@@ -70,7 +70,7 @@ mpo_estado_unico <- setdiff(unique_mpo, dupl_mpo)
 especies <- nomesLC
 familias <- arvoresLC$Family
 #cria um vetor vazio para ficar de olho em algumas espçecies que ainda tem NA nas notas.
-checar <- vector()
+
 for (i in 1:length(especies)) {
     print(paste("Processando", especies[i], i, "de", length(especies), sep = " "))
 
@@ -216,33 +216,27 @@ tabela_corrigida2 <- tabela_corrigida %>%
         decimalLatitude = new_Lat,
         bibliographicCitation = "GBIF",
         comments = notes
-    ) %>% select(one_of(names(tabela_sistema)))
+    ) %>% dplyr::select(one_of(names(tabela_sistema)))
     tabela_corrigida2$dateIdentified <- as_date(tabela_corrigida2$dateIdentified) %>% ymd() %>% as.character()
 tabela_corrigida2[is.na(tabela_corrigida2)] <- ""
 
     #para checar o resultado
     write.csv(tabela_corrigida2, file = nome_centroides)
-
-    #if (any(is.na(tabela_corrigida$notes))) {
- #   checar <- append(checar, i)
-  #  tabela_checar <- tabela_corrigida %>% filter(is.na(notes))
-   # nome_checar <- paste0("./output/",familias[i],"/",familias[i], "_", especies[i],"_",
-    #                          "centroides_checar.csv")
-    #write.csv(tabela_checar, file = nome_checar)
-#}
 }
 
-checar
+
 
 ####sp_filt de Diogo
-spfilt::filt()
 mpos <- rgdal::readOGR(dsn = "./data/shape/Limites_v2017/", layer = "lim_municipio_a")
-tabela_centroides_2 <- tabela_centroides %>% rename(geocodigo = GEOCODIGO, nome = NOME) %>% mutate(geocodigo = as.factor(geocodigo))
+tabela_centroides_2 <- tabela_centroides %>%
+    rename(geocodigo = GEOCODIGO, nome = NOME) %>%
+    mutate(geocodigo = as.factor(geocodigo))
 mpos@data <- left_join(mpos@data, tabela_centroides_2)
 proj4string(mpos)
 mpos2 <- sp::spTransform(mpos, CRSobj = CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"))
 # names(mpos2)
 # dim(mpos@data)
+
 shape.municipios <- mpos2
 
 for (i in 1:length(especies)) {
@@ -253,10 +247,10 @@ for (i in 1:length(especies)) {
                               "sp_filt.csv")
     tabela_especie <- read.csv(nome_centroides, row.names = 1, stringsAsFactors = F)
 
-    tabela_sppfilt <- tabela_especie %>% dplyr::mutate(ID = row_number())
+    tabela_especie2 <- tabela_especie %>% dplyr::mutate(ID = row_number())
 
-    tabela_sppfilt <- tabela_sppfilt %>%
-        select("scientificName", 'decimalLongitude', 'decimalLatitude', 'municipality', "stateProvince") %>%
+    tabela_sppfilt <- tabela_especie2 %>%
+        dplyr::select("ID", "scientificName", 'decimalLongitude', 'decimalLatitude', 'municipality', "stateProvince") %>%
         rename(species = scientificName,
                lon = decimalLongitude,
                lat = decimalLatitude,
@@ -265,16 +259,29 @@ for (i in 1:length(especies)) {
         tabela_sppfilt <- tabela_sppfilt[complete.cases(cbind(tabela_sppfilt$lon, tabela_sppfilt$lat)),]
 
 
-    sp_filt_res <- filt(pts = tabela_sppfilt,
-                           inverted = T)
-
+    sp_filt_res <- filt_andrea(pts = tabela_sppfilt,
+                           inverted = T,
+                        shape.municipios = mpos2)
+print(nrow(tabela_especie))
+print(nrow(tabela_especie2))
+print(nrow(tabela_sppfilt))
+print(nrow(sp_filt_res))
 sp_filt_res <- sp_filt_res %>% rename(scientificName = species,
-                                      new_Lon = lon,
-                                      new_Lat = lat,
-                                      municipality = county.orig)
+                                      decimalLongitude = lon,
+                                      decimalLatitude = lat,
+                                      lowercase_municipality = county.original)
+tabela_especie2 <- tabela_especie2 %>%
+    mutate(lowercase_municipality = textclean::replace_non_ascii(tolower(municipality)))
 
-#resultado_final <- left_join(tabela_sppfilt, sp_filt_res)
-#if (nrow(tabela_especie) != nrow(resultado_final)) stop()
-        write.csv(sp_filt_res, nome_spfilt)
-}
+resultado_final <- left_join(tabela_especie2, sp_filt_res) %>%
+    mutate(comments = paste(comments, filt)) %>%
+    mutate(comments = ifelse(filt == "outside municipality",
+                             paste(comments, "original in", lowercase_municipality, "falls in", county.shape),
+                             comments)) %>%
+    dplyr::select(one_of(names(tabela_especie)))
+
+if (nrow(resultado_final) != nrow(tabela_especie)) stop()
+        write.csv(resultado_final, nome_spfilt)
+
+        }
 
