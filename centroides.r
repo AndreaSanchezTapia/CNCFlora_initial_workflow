@@ -10,6 +10,7 @@ library(flora)
 library(lubridate)
 #devtools::install_github("diogosbr/spfilt")
 library(spfilt)
+source("~/Documents/2 Coleguinhas/Diogo/sp_filt/R/filt_andrea.R")
 # le tudo
 arvoresLC <- read_excel("./data/arvores_endemicas_possiveis_nao_ameacadas.xlsx", sheet = 1)
 #tira autores
@@ -36,7 +37,8 @@ tabela_centroides_ucs <- tabela_centroides_ucs %>%
 
 #shape estados----
 library(rgdal)
-estados <- rgdal::readOGR(dsn = "./data/shape/Limites_v2017/", layer = "lim_unidade_federacao_a")
+estados <- rgdal::readOGR(dsn = "./data/shape/Limites_v2017/",
+                          layer = "lim_unidade_federacao_a")
 #tabela com a sigla pois uma limpeza é substituir a sigla ("rj") pelo nome completo
 sigla_estados <- estados@data[,c("nome", "sigla")] %>% data.frame() %>%
     mutate(stateProvince = replace_non_ascii(tolower(nome))) %>%
@@ -69,7 +71,11 @@ mpo_estado_unico <- setdiff(unique_mpo, dupl_mpo)
 #assignação de centroides----
 especies <- nomesLC
 familias <- arvoresLC$Family
+which(especies == "Eremanthus elaeagnus")
 #cria um vetor vazio para ficar de olho em algumas espçecies que ainda tem NA nas notas.
+##running Eremanthus elaeagnus
+familias <- "Asteraceae"
+especies <- "Eremanthus elaeagnus"
 
 for (i in 1:length(especies)) {
     print(paste("Processando", especies[i], i, "de", length(especies), sep = " "))
