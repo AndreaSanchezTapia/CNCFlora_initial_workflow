@@ -10,7 +10,7 @@ library(flora)
 library(lubridate)
 #devtools::install_github("diogosbr/spfilt")
 library(spfilt)
-source("~/Documents/2 Coleguinhas/Diogo/sp_filt/R/filt_andrea.R")
+source("./fct/filt_andrea.R")
 # le tudo
 arvoresLC <- read_excel("./data/arvores_endemicas_possiveis_nao_ameacadas.xlsx", sheet = 1)
 #tira autores
@@ -72,10 +72,10 @@ mpo_estado_unico <- setdiff(unique_mpo, dupl_mpo)
 especies <- nomesLC
 familias <- arvoresLC$Family
 which(especies == "Eremanthus elaeagnus")
-#cria um vetor vazio para ficar de olho em algumas espçecies que ainda tem NA nas notas.
-##running Eremanthus elaeagnus
-familias <- "Asteraceae"
-especies <- "Eremanthus elaeagnus"
+#cria um vetor vazio para ficar de olho em algumas especies que ainda tem NA nas notas.
+##estes dois é só para rodar Eremanthus elaeagnus que estava dando erro
+#familias <- "Asteraceae"
+#especies <- "Eremanthus elaeagnus"
 
 for (i in 1:length(especies)) {
     print(paste("Processando", especies[i], i, "de", length(especies), sep = " "))
